@@ -1,0 +1,11 @@
+ProductID,ProductDescription,Qty,UOM_ID,ForDate,AddressID,ContactID,Sale 
+50,HotDog Premium,10,Case,10/09/2025,NY-2,711,20
+50,HotDog Premium,10,Case,12/09/2025,NY-2,711,
+50,HotDog Premium,10,Case,14/09/2025,NY-2,711,20
+50,HotDog Premium,,Case,20/09/2025,NY-2,711,20
+50,HotDog Premium,10,Case,22/09/2025,NY-2,711,300
+51,HotDog tray,100,Piece,10/09/2025,NY-2,711,500
+51,HotDog tray,100,Piece,12/09/2025,NY-2,711,500
+51,HotDog tray,100,Piece,14/09/2025,NY-2,711,500
+51,HotDog tray,50,Piece,20/09/2025,NY-2,711,
+51,HotDog tray,100,Piece,22/09/2025,NY-2,711,

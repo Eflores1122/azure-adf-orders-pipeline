@@ -1,0 +1,195 @@
+{
+	"name": "df_orders_etl",
+	"properties": {
+		"type": "MappingDataFlow",
+		"typeProperties": {
+			"sources": [
+				{
+					"dataset": {
+						"referenceName": "ds_dict_usd_csv",
+						"type": "DatasetReference"
+					},
+					"name": "Diccionario"
+				},
+				{
+					"dataset": {
+						"referenceName": "ds_orders_raw_csv",
+						"type": "DatasetReference"
+					},
+					"name": "Pedidos"
+				}
+			],
+			"sinks": [
+				{
+					"dataset": {
+						"referenceName": "ds_sql_orders",
+						"type": "DatasetReference"
+					},
+					"name": "Orders",
+					"rejectedDataLinkedService": {
+						"referenceName": "ls_adls_datalake_mi",
+						"type": "LinkedServiceReference",
+						"parameters": {
+							"storageAccountName": "<storage-account-name>"
+						}
+					}
+				},
+				{
+					"dataset": {
+						"referenceName": "ds_rejects_csv",
+						"type": "DatasetReference"
+					},
+					"name": "sinkRejects"
+				}
+			],
+			"transformations": [
+				{
+					"name": "DerivarArchivo"
+				},
+				{
+					"name": "DerivarCampos"
+				},
+				{
+					"name": "OrdenFinal"
+				},
+				{
+					"name": "BusquedaCosto"
+				},
+				{
+					"name": "SelectionRows"
+				},
+				{
+					"name": "DerivarRechazos"
+				},
+				{
+					"name": "filterDeliveryOrder"
+				}
+			],
+			"scriptLines": [
+				"source(output(",
+				"          IDProduct as string,",
+				"          {Sale Cost (USD)} as string",
+				"     ),",
+				"     allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false) ~> Diccionario",
+				"source(output(",
+				"          ProductID as string,",
+				"          ProductDescription as string,",
+				"          Quantity as string,",
+				"          UOM_ID as string,",
+				"          ForDate as string,",
+				"          AddressID as string,",
+				"          ContactID as string,",
+				"          Sale as string",
+				"     ),",
+				"     allowSchemaDrift: false,",
+				"     validateSchema: false,",
+				"     ignoreNoFilesFound: false,",
+				"     rowUrlColumn: 'RawPath',",
+				"     wildcardPaths:['2025/08/28/BestLocalPizza_DeliveryOrder_20250828T053149Z.csv']) ~> Pedidos",
+				"Pedidos derive(FileName = substringIndex(RawPath, '/', -1)) ~> DerivarArchivo",
+				"DerivarArchivo derive(CustomerName = substringIndex(FileName, '_', 1),",
+				"          EmailTimestamp = toTimestamp(\r",
+				"  replace(\r",
+				"    replace(\r",
+				"      substringIndex(\r",
+				"        substringIndex(FileName, '.csv', 1),\r",
+				"        'DeliveryOrder_', -1\r",
+				"      ),\r",
+				"      'T', ' '\r",
+				"    ),\r",
+				"    'Z', ''\r",
+				"  ),\r",
+				"  'yyyyMMdd HHmmss'\r",
+				"),",
+				"          Quantity = iif(isNull(Quantity) || trim(Quantity)=='' , toInteger(null()), toInteger(Quantity)),",
+				"          ForDate = iif(isNull(ForDate) || trim(ForDate)=='' , toDate(null()), toDate(ForDate,'d/M/yyyy'))) ~> DerivarCampos",
+				"filterDeliveryOrder sort(asc(ProductID, true),",
+				"     asc(ProductDescription, true),",
+				"     asc(Quantity, true),",
+				"     asc(UOM_ID, true),",
+				"     asc(ForDate, true),",
+				"     asc(AddressID, true),",
+				"     asc(ContactID, true),",
+				"     asc(Sale, true),",
+				"     asc(CustomerName, true),",
+				"     asc(EmailTimestamp, true)) ~> OrdenFinal",
+				"OrdenFinal, Diccionario lookup(ProductID == IDProduct,",
+				"     multiple: false,",
+				"     pickup: 'any',",
+				"     broadcast: 'auto')~> BusquedaCosto",
+				"BusquedaCosto split(not(isNull(Quantity)),",
+				"     disjoint: false) ~> SelectionRows@(goodRows, badRows)",
+				"SelectionRows@badRows derive(RejectReason = 'Quantity is NULL',",
+				"          OutFileName = toString(currentUTC(),'yyyy') + '/' +\r",
+				"toString(currentUTC(),'MM') + '/' +\r",
+				"toString(currentUTC(),'dd') + '/' +\r",
+				"CustomerName + '/' +\r",
+				"CustomerName + '_rejects_' + toString(currentUTC(),'yyyyMMddHHmmss') + '_' + FileName) ~> DerivarRechazos",
+				"DerivarCampos filter(startsWith(",
+				"  upper(FileName),",
+				"  upper(substringIndex(FileName, '_', 1) + '_DeliveryOrder_')",
+				")",
+				"&&",
+				"toString(",
+				"  toTimestamp(substringIndex(FileName, '_', -1), 'yyyyMMdd\\'T\\'HHmmss\\'Z\\''),",
+				"  'yyyy-MM-dd'",
+				")",
+				"==",
+				"toString(currentUTC(), 'yyyy-MM-dd')) ~> filterDeliveryOrder",
+				"SelectionRows@goodRows sink(allowSchemaDrift: true,",
+				"     validateSchema: true,",
+				"     deletable:false,",
+				"     insertable:true,",
+				"     updateable:false,",
+				"     upsertable:false,",
+				"     format: 'table',",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     errorHandlingOption: 'stopOnFirstError',",
+				"     mapColumn(",
+				"          ProductID,",
+				"          ProductDescription,",
+				"          Quantity,",
+				"          UOM_ID,",
+				"          ForDate,",
+				"          AddressID,",
+				"          ContactID,",
+				"          Sale,",
+				"          RawPath,",
+				"          FileName,",
+				"          CustomerName,",
+				"          EmailTimestamp,",
+				"          IDProduct,",
+				"          {Sale Cost (USD)}",
+				"     )) ~> Orders",
+				"DerivarRechazos sink(allowSchemaDrift: true,",
+				"     validateSchema: false,",
+				"     umask: 0022,",
+				"     preCommands: [],",
+				"     postCommands: [],",
+				"     skipDuplicateMapInputs: true,",
+				"     skipDuplicateMapOutputs: true,",
+				"     mapColumn(",
+				"          ProductID,",
+				"          ProductDescription,",
+				"          Quantity,",
+				"          UOM_ID,",
+				"          ForDate,",
+				"          AddressID,",
+				"          ContactID,",
+				"          Sale,",
+				"          RawPath,",
+				"          FileName,",
+				"          CustomerName,",
+				"          EmailTimestamp,",
+				"          IDProduct,",
+				"          {Sale Cost (USD)},",
+				"          RejectReason,",
+				"          OutFileName",
+				"     )) ~> sinkRejects"
+			]
+		}
+	}
+}

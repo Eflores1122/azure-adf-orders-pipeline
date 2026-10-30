@@ -1,0 +1,9 @@
+{
+	"name": "adf-orders-pipeline",
+	"location": "mexicocentral",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "<managed-identity-principal-id>",
+		"tenantId": "<tenant-id>"
+	}
+}

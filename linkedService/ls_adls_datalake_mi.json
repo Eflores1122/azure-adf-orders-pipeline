@@ -1,0 +1,17 @@
+{
+	"name": "ls_adls_datalake_mi",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"parameters": {
+			"storageAccountName": {
+				"type": "String",
+				"defaultValue": "<storage-account-name>"
+			}
+		},
+		"annotations": [],
+		"type": "AzureBlobFS",
+		"typeProperties": {
+			"url": "https://@{linkedService().storageAccountName}.dfs.core.windows.net/"
+		}
+	}
+}

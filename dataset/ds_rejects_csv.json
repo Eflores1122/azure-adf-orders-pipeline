@@ -1,0 +1,26 @@
+{
+	"name": "ds_rejects_csv",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_adls_datalake_mi",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"storageAccountName": "<storage-account-name>"
+			}
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileSystem": "rejects"
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

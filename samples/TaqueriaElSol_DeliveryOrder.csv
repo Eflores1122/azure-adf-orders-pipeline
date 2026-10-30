@@ -1,0 +1,9 @@
+ProductID,ProductDescription,Quantity,UOM_ID,ForDate,AddressID,ContactID,Sale
+MX-TAC-001,Taco al pastor,12,EA,28/8/2025,1001,CT-7001,29.88
+MX-TAC-002,Taco de suadero,10,EA,28/8/2025,1002,CT-7002,24.90
+MX-QUE-010,Quesadilla de huitlacoche,8,EA,28/8/2025,1003,CT-7003,39.92
+MX-QUE-011,Quesadilla de flor,6,EA,28/8/2025,1004,CT-7004,29.94
+MX-SOP-020,Sopes surtidos,5,EA,28/8/2025,1005,CT-7005,34.95
+MX-GUA-030,Guacamole,7,EA,28/8/2025,1006,CT-7006,48.93
+MX-AGU-040,Agua de horchata 1L,9,EA,28/8/2025,1007,CT-7007,26.91
+MX-AGU-041,Agua de jamaica 1L,11,EA,28/8/2025,1008,CT-7008,32.89

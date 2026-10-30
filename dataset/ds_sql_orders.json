@@ -1,0 +1,21 @@
+{
+	"name": "ds_sql_orders",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_sqldb_mi",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"sqlServerName": "<sql-server-name>",
+				"sqlDatabaseName": "<sql-database-name>"
+			}
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "Orders"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

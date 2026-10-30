@@ -1,0 +1,36 @@
+{
+	"name": "ds_dict_usd_csv",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_adls_datalake_mi",
+			"type": "LinkedServiceReference",
+			"parameters": {
+				"storageAccountName": "<storage-account-name>"
+			}
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": "Dict_USD.csv",
+				"fileSystem": "dict"
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": [
+			{
+				"name": "IDProduct",
+				"type": "String"
+			},
+			{
+				"name": "Sale Cost (USD)",
+				"type": "String"
+			}
+		]
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}

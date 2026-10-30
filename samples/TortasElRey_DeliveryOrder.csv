@@ -1,0 +1,9 @@
+ProductID,ProductDescription,Quantity,UOM_ID,ForDate,AddressID,ContactID,Sale
+MX-TOR-001,Torta de milanesa,9,EA,29/8/2025,2001,CT-8001,134.91
+MX-TOR-002,Torta de pierna,7,EA,29/8/2025,2002,CT-8002,94.43
+MX-TOR-003,Torta cubana,5,EA,29/8/2025,2003,CT-8003,99.95
+MX-TOR-004,Torta hawaiana,8,EA,29/8/2025,2004,CT-8004,103.92
+MX-TOR-005,Torta al pastor,6,EA,29/8/2025,2005,CT-8005,83.94
+MX-TOR-006,Torta de cochinita,10,EA,29/8/2025,2006,CT-8006,144.90
+MX-TOR-007,Torta ahogada,4,EA,29/8/2025,2007,CT-8007,61.96
+MX-TOR-008,Torta de chorizo,11,EA,29/8/2025,2008,CT-8008,137.39

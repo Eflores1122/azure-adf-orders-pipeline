@@ -1,0 +1,25 @@
+{
+	"name": "ls_sqldb_mi",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"parameters": {
+			"sqlServerName": {
+				"type": "String",
+				"defaultValue": "<sql-server-name>"
+			},
+			"sqlDatabaseName": {
+				"type": "String",
+				"defaultValue": "<sql-database-name>"
+			}
+		},
+		"annotations": [],
+		"type": "AzureSqlDatabase",
+		"typeProperties": {
+			"server": "@{linkedService().sqlServerName}.database.windows.net",
+			"database": "@{linkedService().sqlDatabaseName}",
+			"encrypt": "mandatory",
+			"trustServerCertificate": false,
+			"authenticationType": "SystemAssignedManagedIdentity"
+		}
+	}
+}

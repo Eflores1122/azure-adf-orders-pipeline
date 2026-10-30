@@ -1,0 +1,129 @@
+{
+	"name": "pl_ordenes",
+	"properties": {
+		"activities": [
+			{
+				"name": "act_df_orders_etl",
+				"type": "ExecuteDataFlow",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataflow": {
+						"referenceName": "df_orders_etl",
+						"type": "DataFlowReference"
+					},
+					"compute": {
+						"coreCount": 8,
+						"computeType": "General"
+					},
+					"traceLevel": "Fine"
+				}
+			},
+			{
+				"name": "set_customer",
+				"type": "SetVariable",
+				"dependsOn": [
+					{
+						"activity": "act_df_orders_etl",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "v_customerName",
+					"value": {
+						"value": "@split(\r\n  if(\r\n    empty(pipeline().parameters.p_fileName),\r\n    'BestLocalPizza_DeliveryOrder_20250828T053149Z.csv',\r\n    pipeline().parameters.p_fileName\r\n  ),\r\n  '_'\r\n)[0]",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "If if_hay_rechazos",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "set_customer",
+						"dependencyConditions": [
+							"Completed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@greater(int(activity('act_df_orders_etl').output.runStatus.metrics.sinkRejects.rowsWritten), 0)",
+						"type": "Expression"
+					},
+					"ifTrueActivities": [
+						{
+							"name": "web_alerta",
+							"type": "WebActivity",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"method": "POST",
+								"headers": {
+									"Content-Type": "application/json"
+								},
+								"httpRequestTimeout": "00:02:00",
+								"turnOffAsync": true,
+								"url": "@pipeline().parameters.p_alertLogicAppUrl",
+								"body": {
+									"value": "{\n  \"fileName\": \"@{pipeline().parameters.p_fileName}\",\n  \"customerName\": \"@{variables('v_customerName')}\",\n  \"rejects\": @{activity('act_df_orders_etl').output.runStatus.metrics.sinkRejects.rowsWritten},\n  \"blobUrl\": \"@{concat('https://', pipeline().parameters.p_storageAccountName, '.blob.core.windows.net/raw/', replace(pipeline().parameters.p_folderPath,'raw/',''), '/', pipeline().parameters.p_fileName)}\"\n}",
+									"type": "Expression"
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"p_folderPath": {
+				"type": "string"
+			},
+			"p_fileName": {
+				"type": "string"
+			},
+			"p_storageAccountName": {
+				"type": "string",
+				"defaultValue": "<storage-account-name>"
+			},
+			"p_alertLogicAppUrl": {
+				"type": "string",
+				"defaultValue": "<logic-app-http-trigger-url>"
+			}
+		},
+		"variables": {
+			"v_customerName": {
+				"type": "String"
+			},
+			"v_fileName": {
+				"type": "String"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2025-08-29T02:15:56Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

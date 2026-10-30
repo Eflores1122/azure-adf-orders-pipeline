@@ -1,0 +1,8 @@
+ProductID,ProductDescription,Quantity,UOM_ID,ForDate,AddressID,ContactID,Sale
+70,"Pizza box 16""",500,Piece,10/09/2025,NY-4,512,1400
+70,"Pizza box 16""",500,Piece,10/09/2025,NY-5,512,1400
+70,"Pizza box 16""",500,Piece,10/09/2025,NY-7,512,
+70,"Pizza box  12""",700,Piece,10/09/2025,NY-4,512,1400
+70,"Pizza box 12""",700,Piece,10/09/2025,NY-5,512,
+70,"Pizza box  12""",700,Piece,10/09/2025,NY-7,512,20
+45,"Burger bun 4""",,Piece,13/09/2025,NY-4,512,
