@@ -21,3 +21,6 @@ venv/
 # ADF publish output generated outside this Git export
 adf_publish/
 *.publish.json
+
+# GitHub Pages artifact assembled by scripts/assemble_site.py
+_site/

@@ -1,3 +1,5 @@
+Sitio: https://eflores1122.github.io/azure-adf-orders-pipeline/
+
 # Azure Data Factory — order CSV ingestion pipeline
 
 Portfolio project for **Edgar Flores**, Data & AI Engineer. This repository is an Azure Data Factory Git export, built with sample data, for a delivery-order CSV flow: land files in ADLS Gen2, split rows in a mapping data flow, load valid rows to Azure SQL `dbo.Orders`, write rejected rows to ADLS, and POST an alert when rejects were written.
@@ -24,9 +26,12 @@ The JSON in this repository is the checked-in behavior. The mapping notes also d
 | `trigger/trg_raw_created.json` | Blob Created trigger on the `raw` container |
 | `samples/` | Example order CSVs used by the local reject-split check |
 | `scripts/validate_adf.py` | Structural and sample-CSV checks |
+| `scripts/assemble_site.py` | Copies `site/` and `samples/` into the Pages artifact `_site/` |
+| `site/` | Browser page that runs the same reject split |
 | `tests/` | pytest suite for those checks |
 | `publish_config.json` | ADF publish branch (`adf_publish`) |
 | `.github/workflows/ci.yml` | CI with no secrets |
+| `.github/workflows/pages.yml` | GitHub Pages deploy on push to `main` |
 
 This is the folder layout ADF writes in Git mode. Logic App definitions are not in this repository. The pipeline only calls an alert URL parameter.
 
@@ -106,7 +111,7 @@ Checked-in script in `dataflow/df_orders_etl.json`:
 - `EmailTimestamp` parses the value after `DeliveryOrder_` with pattern `yyyyMMdd HHmmss`.
 - `Quantity` becomes null when the source value is null or blank; otherwise `toInteger(Quantity)`.
 - `ForDate` uses `d/M/yyyy`, or null when blank.
-- `filterDeliveryOrder` keeps names that start with `<prefix>_DeliveryOrder_` and whose filename timestamp date equals the current UTC date.
+- `filterDeliveryOrder` keeps a name that starts with `<prefix>_DeliveryOrder_` only when the last `_` segment matches `yyyyMMdd'T'HHmmss'Z'` and that date is the current UTC date. The four names in `samples/` end in `DeliveryOrder.csv`, so the prefix fails. On `BestLocalPizza_DeliveryOrder_20250828T053149Z.csv` the last segment is `20250828T053149Z.csv`, and the `.csv` suffix keeps the pattern from matching.
 - `BusquedaCosto` looks up `ProductID == IDProduct` in the dictionary (one match, any pick).
 - `SelectionRows` sends `not(isNull(Quantity))` to `goodRows` and the remaining rows to `badRows`.
 - Rejected rows get `RejectReason = 'Quantity is NULL'` and an `OutFileName` under `yyyy/MM/dd/<CustomerName>/`.
@@ -158,6 +163,14 @@ python -m pytest
 
 GitHub Actions runs the same commands on push and pull request. The workflow does not use secrets.
 
+## Browser
+
+[site/index.html](site/index.html) runs `classify_order_row` in the browser. Pick one of the four files in `samples/`, or upload a CSV. The table marks each row valid or rejected and gives the reason. Counts for the sample files match `python scripts/validate_adf.py`.
+
+The page also evaluates `filterDeliveryOrder` for the file name and shows whether `web_alerta` would POST. It does not start Data Factory and it does not read `dict/Dict_USD.csv`. A published data flow fails when that dictionary is missing (`ignoreNoFilesFound: false`).
+
+`.github/workflows/pages.yml` publishes the page on every push to `main` and on `workflow_dispatch`. `python scripts/assemble_site.py` builds the `_site/` artifact.
+
 ## Placeholders
 
 | Placeholder | Where it is set |
@@ -176,12 +189,14 @@ Give the factory managed identity **Storage Blob Data Contributor** on the lake 
 ## Limits of the checked-in flow
 
 - The orders source reads one hardcoded wildcard path, so the trigger file name does not select the CSV inside the data flow.
-- `filterDeliveryOrder` keeps only files whose embedded timestamp date is the current UTC date.
+- `filterDeliveryOrder` drops the four sample names, and the hardcoded wildcard path does not match `yyyyMMdd'T'HHmmss'Z'` because the last `_` segment still ends in `.csv`. See the data flow rules above.
 - `v_fileName` is unused, and the data flow has no `df_fileName` parameter.
 - `FastFoodNY_DeliveryOrder.csv` uses `Qty`. Those rows fall into the reject stream under the checked-in `Quantity` expression.
 - Publishing still requires a real factory, role assignments, `dict/Dict_USD.csv`, and the placeholder values above. `publish_config.json` points publish output at branch `adf_publish`.
 
 ---
+
+Sitio: https://eflores1122.github.io/azure-adf-orders-pipeline/
 
 # Azure Data Factory — pipeline de ingesta de CSV de pedidos
 
@@ -209,9 +224,12 @@ El JSON del repositorio es el comportamiento versionado. Las notas de mapeo tamb
 | `trigger/trg_raw_created.json` | Desencadenador Blob Created sobre el contenedor `raw` |
 | `samples/` | CSV de ejemplo para la validación local del split |
 | `scripts/validate_adf.py` | Validación estructural y de los CSV |
+| `scripts/assemble_site.py` | Copia `site/` y `samples/` al artefacto `_site/` |
+| `site/` | Página que ejecuta el mismo corte de rechazos |
 | `tests/` | Pruebas pytest |
 | `publish_config.json` | Rama de publicación ADF (`adf_publish`) |
 | `.github/workflows/ci.yml` | CI sin secretos |
+| `.github/workflows/pages.yml` | Publicación en GitHub Pages al hacer push a `main` |
 
 Las definiciones de Logic Apps no están en el repositorio. La canalización solo llama al parámetro de la URL de alerta.
 
@@ -276,7 +294,7 @@ La Logic App de ingesta del diagrama es el diseño previo descrito en `Diagrams.
 - `EmailTimestamp` interpreta el texto posterior a `DeliveryOrder_` con el patrón `yyyyMMdd HHmmss`.
 - `Quantity` queda nula si el origen es nulo o vacío; si no, usa `toInteger(Quantity)`.
 - `ForDate` usa `d/M/yyyy`, o nulo si viene vacío.
-- `filterDeliveryOrder` conserva nombres que empiezan con `<prefijo>_DeliveryOrder_` y cuya fecha del timestamp es la fecha UTC actual.
+- `filterDeliveryOrder` deja pasar un nombre que empieza con `<prefijo>_DeliveryOrder_` solo si el último segmento `_` coincide con `yyyyMMdd'T'HHmmss'Z'` y esa fecha es la UTC de hoy. Los cuatro nombres de `samples/` terminan en `DeliveryOrder.csv`, así que el prefijo falla. En `BestLocalPizza_DeliveryOrder_20250828T053149Z.csv` el último segmento es `20250828T053149Z.csv`: el sufijo `.csv` impide que el patrón coincida.
 - `BusquedaCosto` hace lookup `ProductID == IDProduct`.
 - `SelectionRows` envía `not(isNull(Quantity))` a `goodRows` y el resto a `badRows`.
 - Los rechazos llevan `RejectReason = 'Quantity is NULL'` y `OutFileName` bajo `yyyy/MM/dd/<Cliente>/`.
@@ -324,6 +342,14 @@ python -m pytest
 
 GitHub Actions ejecuta los mismos comandos en push y pull request, sin secretos.
 
+## Navegador
+
+[site/index.html](site/index.html) ejecuta `classify_order_row` en el navegador. Se elige uno de los cuatro CSV de `samples/` o se sube otro. La tabla marca cada fila como válida o rechazo y muestra el motivo. Los conteos de las muestras coinciden con `python scripts/validate_adf.py`.
+
+La página también evalúa `filterDeliveryOrder` para el nombre del archivo y muestra si `web_alerta` haría POST. No arranca Data Factory y no lee `dict/Dict_USD.csv`. El flujo publicado falla si ese diccionario no existe (`ignoreNoFilesFound: false`).
+
+`.github/workflows/pages.yml` publica la página en cada push a `main` y con `workflow_dispatch`. `python scripts/assemble_site.py` construye el artefacto `_site/`.
+
 ## Marcadores
 
 Sustituye `<storage-account-name>`, `<sql-server-name>` (sin el sufijo `.database.windows.net`), `<sql-database-name>`, `<subscription-id>`, `<resource-group>`, `<tenant-id>`, `<managed-identity-principal-id>` y `<logic-app-http-trigger-url>` en los JSON indicados en la sección en inglés.
@@ -335,7 +361,7 @@ Concede a la identidad de la factoría **Storage Blob Data Contributor** sobre e
 ## Límites del flujo versionado
 
 - El origen de pedidos lee una ruta comodín fija, así que el nombre de archivo del desencadenador no elige el CSV dentro del flujo.
-- `filterDeliveryOrder` solo deja pasar archivos cuya fecha embebida es la fecha UTC de hoy.
+- `filterDeliveryOrder` deja fuera los cuatro nombres de `samples/`. La ruta comodín tampoco coincide con `yyyyMMdd'T'HHmmss'Z'` porque el último segmento `_` sigue terminando en `.csv`. El detalle está en las reglas del flujo.
 - `v_fileName` no se usa y el flujo no declara `df_fileName`.
 - `FastFoodNY_DeliveryOrder.csv` usa `Qty`, así que esas filas caen en rechazos con la expresión actual de `Quantity`.
 - Publicar exige una factoría real, roles, `dict/Dict_USD.csv` y los marcadores. `publish_config.json` envía la publicación a la rama `adf_publish`.

@@ -37,6 +37,8 @@ Este documento describe el **mapeo de campos**, la **lógica de transformación*
 | (Derivada)         | `substringIndex(FileName,'_',1)`                                                           | CustomerName       | nvarchar(100)            |
 | (Derivada)         | ver “Derivaciones”                                                                         | EmailTimestamp     | datetime2(0)             |
 
+La expresión versionada de `Quantity` en `dataflow/df_orders_etl.json` lee solo `Quantity`: `iif(isNull(Quantity) || trim(Quantity)=='', toInteger(null()), toInteger(Quantity))`. `scripts/validate_adf.py` trata una columna `Quantity` ausente como nula. `Qty` permanece en la fila y no se copia a `Quantity`. El origen del diccionario tiene `ignoreNoFilesFound: false`, así que la falta de `dict/Dict_USD.csv` detiene el flujo. Ese archivo no está en el repositorio.
+
 ### Derivaciones (expresiones de Flujo de datos)
 
 * FileName

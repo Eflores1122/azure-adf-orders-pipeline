@@ -10,7 +10,7 @@ Describir de extremo a extremo cómo un adjunto .csv enviado por correo termina 
 - Logic App Ingesta: recibe el correo, extrae el adjunto y lo guarda en ADLS Gen2 /raw/.
 - ADLS Gen2 (/raw/): landing zone de archivos; emite el evento Blob creado.
 - Azure Data Factory – Pipeline pl_ordenes: se dispara por el evento; orquesta la ejecución del Data Flow.
-- Data Flow act_df_orders_etl: transforma, enriquece y valida; separa good_rows vs bad_rows.
+- Data flow df_orders_etl (actividad act_df_orders_etl): deriva columnas y separa goodRows y badRows.
 - Azure SQL (dbo.Orders): destino de filas válidas, vía el dataset `ds_sql_orders`.
 - ADLS Gen2 (/rejects/): destino de filas rechazadas, vía el dataset `ds_rejects_csv`.
 - Logic App Alerta: HTTP trigger; envía correo de alerta cuando existen rechazos.
@@ -21,7 +21,7 @@ Describir de extremo a extremo cómo un adjunto .csv enviado por correo termina 
 - El Data Flow deriva metadatos del nombre de archivo, enriquece con diccionario, valida y split:
 - good_rows → dbo.Orders.
 - bad_rows → /rejects/.
-- Si hay rechazos, se invoca la Logic App de alerta → correo a interesados.
+- Si sinkRejects.rowsWritten es mayor que 0, web_alerta hace POST a p_alertLogicAppUrl. El correo lo enviaría la Logic App de alerta. Esa definición no está en el repositorio.
 
 ## Condiciones clave/negocio
 
@@ -32,7 +32,7 @@ Describir de extremo a extremo cómo un adjunto .csv enviado por correo termina 
 Observabilidad recomendada
 
 - Métricas por ejecución: archivos procesados, filas válidas/rechazadas, tiempo total.
-- Identificadores: p_fileName, df_fileName para cruzar ADF ↔ SQL ↔ ADLS.
+- Identificadores en el JSON: p_fileName y v_customerName. v_fileName está declarada y ninguna actividad la usa. df_fileName no está en el flujo.
 
 Diagrama derivado de `factory/adf-orders-pipeline.json`, `trigger/trg_raw_created.json`, `pipeline/pl_ordenes.json`, `dataflow/df_orders_etl.json`, `dataset/` y `linkedService/`. La factoría es `adf-orders-pipeline` (`mexicocentral`, identidad `SystemAssigned`). El correo y la Logic App de ingesta no están en esos JSON; el desencadenador empieza en el evento de blob.
 
@@ -94,6 +94,8 @@ Trazabilidad
 - Patrón de nombre de archivo incumplido.
 
 Diagrama derivado de `scriptLines` en `dataflow/df_orders_etl.json`. `Pedidos` lee la ruta comodín `2025/08/28/BestLocalPizza_DeliveryOrder_20250828T053149Z.csv` y guarda la URL de fila en `RawPath`.
+
+`filterDeliveryOrder` exige que el nombre empiece por `<prefijo>_DeliveryOrder_` y que el último segmento `_` coincida exactamente con `yyyyMMdd'T'HHmmss'Z'`. Los cuatro CSV de `samples/` terminan en `DeliveryOrder.csv`, así que el prefijo falla. En la ruta comodín el último segmento es `20250828T053149Z.csv`: el `.csv` queda dentro del segmento y el patrón no coincide. El script local `classify_order_row` no aplica este filtro. Separa solo por `Quantity`.
 
 ```mermaid
 flowchart TD

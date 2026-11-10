@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>pl_ordenes, pedidos CSV</title>
+  <meta name="description" content="Clasifica un CSV de pedidos con la regla Quantity de classify_order_row y muestra el pipeline pl_ordenes.">
+  <link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+  <a class="skip" href="#rows" data-i18n="skip">Saltar a las filas</a>
+  <div class="wrap">
+    <header>
+      <a class="wordmark" href="#rows">adf-orders-pipeline</a>
+      <nav class="nav">
+        <button type="button" id="lang" data-i18n="langButton">English</button>
+        <a href="https://github.com/Eflores1122/azure-adf-orders-pipeline">GitHub</a>
+      </nav>
+    </header>
+    <main>
+      <h1 id="headline">Pedidos CSV</h1>
+      <p id="lede" class="lede" data-i18n="intro">La página lee el CSV y aplica classify_order_row. Una fila es válida cuando Quantity existe y float() la convierte. Si la columna falta, va vacía o no es numérica, la fila es rechazo.</p>
+
+      <form class="toolbar" id="toolbar">
+        <label class="field" for="sample">
+          <span data-i18n="sampleLabel">CSV de ejemplo</span>
+          <select id="sample" name="sample"></select>
+        </label>
+        <button type="button" class="primary" id="run-sample" data-i18n="run">Correr el pipeline con datos de ejemplo</button>
+        <label class="file-btn">
+          <span data-i18n="uploadLabel">Subir un CSV</span>
+          <input id="upload" type="file" accept=".csv,text/csv">
+        </label>
+      </form>
+
+      <p id="live" class="live" aria-live="polite" data-i18n="loading">Leyendo los CSV de samples/.</p>
+      <p id="mismatch" class="banner" hidden></p>
+
+      <div class="filters" role="group" aria-labelledby="filter-label">
+        <span id="filter-label" class="note" data-i18n="show">Mostrar</span>
+        <button type="button" id="filter-all" aria-pressed="true" data-i18n="all">Todas</button>
+        <button type="button" id="filter-good" aria-pressed="false" data-i18n="good">Válidas</button>
+        <button type="button" id="filter-reject" aria-pressed="false" data-i18n="reject">Rechazos</button>
+      </div>
+
+      <div class="scroll" id="rows" tabindex="0">
+        <table>
+          <caption id="caption"></caption>
+          <thead id="thead"></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+
+      <h2 data-i18n="runTitle">Esta corrida</h2>
+      <p id="gate" class="note"></p>
+      <p id="email-line" class="note"></p>
+      <p id="dict-line" class="note" data-i18n="dictLine">BusquedaCosto no corre aquí. dict/Dict_USD.csv no está en el repositorio y el origen Diccionario tiene ignoreNoFilesFound: false, así que un flujo publicado se detiene si el archivo falta.</p>
+      <p id="alert" class="note"></p>
+      <pre id="payload" class="code" hidden></pre>
+      <p id="outpath" class="note"></p>
+
+      <h2 id="diagram" data-i18n="pipeTitle">Diagrama de pl_ordenes</h2>
+      <p class="note" data-i18n="pipeNote">Actividades y dependencias Completed de pipeline/pl_ordenes.json. El correo y la Logic App de ingesta no están en el repositorio.</p>
+      <ol class="flow">
+        <li style="--i:1"><span class="name">BlobCreated</span><span class="meta" data-i18n="dBlob">.csv bajo /raw/blobs/</span></li>
+        <li style="--i:2"><span class="name">trg_raw_created</span><span class="meta" data-i18n="dTrg">pasa p_folderPath y p_fileName</span></li>
+        <li style="--i:3"><span class="name">pl_ordenes</span><span class="meta" data-i18n="dPl">factoría adf-orders-pipeline, mexicocentral</span></li>
+        <li style="--i:4"><span class="name">act_df_orders_etl</span><span class="meta" data-i18n="dDf">df_orders_etl, General, 8 núcleos</span></li>
+        <li style="--i:5"><span class="name">set_customer</span><span class="meta" id="d-customer">v_customerName</span></li>
+        <li style="--i:6" id="alert-step"><span class="name">If if_hay_rechazos</span><span class="meta" id="d-alert">web_alerta</span></li>
+      </ol>
+
+      <h2 data-i18n="flowTitle">Dentro de df_orders_etl</h2>
+      <ol class="flow">
+        <li style="--i:1"><span class="name">Pedidos</span><span class="meta" data-i18n="sOrders">ds_orders_raw_csv, RawPath, ruta comodín fija</span></li>
+        <li style="--i:2"><span class="name">Diccionario</span><span class="meta" data-i18n="sDict">ds_dict_usd_csv, dict/Dict_USD.csv</span></li>
+        <li style="--i:3"><span class="name">DerivarArchivo</span><span class="meta">FileName = substringIndex(RawPath, '/', -1)</span></li>
+        <li style="--i:4"><span class="name">DerivarCampos</span><span class="meta" data-i18n="sDerive">CustomerName, EmailTimestamp, Quantity, ForDate</span></li>
+        <li style="--i:5"><span class="name">filterDeliveryOrder</span><span class="meta" data-i18n="sFilter">prefijo y patrón de fecha</span></li>
+        <li style="--i:6"><span class="name">OrdenFinal</span><span class="meta" data-i18n="sSort">sort ascendente</span></li>
+        <li style="--i:7"><span class="name">BusquedaCosto</span><span class="meta">ProductID == IDProduct</span></li>
+        <li style="--i:8"><span class="name">SelectionRows</span><span class="meta">not(isNull(Quantity))</span></li>
+      </ol>
+      <div class="branch">
+        <section>
+          <h3 class="good-title">goodRows</h3>
+          <p data-i18n="goodSink">Insert en ds_sql_orders, tabla dbo.Orders. El número de esta corrida es el split de Quantity, no una inserción real.</p>
+          <p id="good-count"></p>
+        </section>
+        <section>
+          <h3>badRows</h3>
+          <p data-i18n="badSink">DerivarRechazos escribe RejectReason = 'Quantity is NULL' y OutFileName. sinkRejects usa ds_rejects_csv.</p>
+          <p id="bad-count"></p>
+        </section>
+      </div>
+      <p id="wildcard" class="note"></p>
+
+      <h2 data-i18n="chartTitle">Conteo medido</h2>
+      <div id="bars"></div>
+      <p id="chart-note" class="note"></p>
+
+      <h2 data-i18n="lineTitle">Linaje de la fila</h2>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr>
+              <th data-i18n="colStep">Paso</th>
+              <th data-i18n="colExpr">Expresión en df_orders_etl.json</th>
+              <th data-i18n="colHere">En esta página</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>DerivarArchivo</td>
+              <td>substringIndex(RawPath, '/', -1)</td>
+              <td data-i18n="lFile">FileName es el nombre del archivo elegido o subido.</td>
+            </tr>
+            <tr>
+              <td>CustomerName</td>
+              <td>substringIndex(FileName, '_', 1)</td>
+              <td data-i18n="lCustomer">Se calcula en cada fila. set_customer usa el primer segmento de split por _.</td>
+            </tr>
+            <tr>
+              <td>EmailTimestamp</td>
+              <td>toTimestamp del texto posterior a DeliveryOrder_, patrón yyyyMMdd HHmmss</td>
+              <td data-i18n="lEmail">Se calcula. Queda nulo cuando el nombre no trae ese timestamp.</td>
+            </tr>
+            <tr>
+              <td>Quantity</td>
+              <td>iif(isNull(Quantity) || trim(Quantity)=='', toInteger(null()), toInteger(Quantity))</td>
+              <td data-i18n="lQty">El veredicto es float() de classify_order_row. 10.5 es válida. Esta página no llama toInteger.</td>
+            </tr>
+            <tr>
+              <td>ForDate</td>
+              <td>toDate(ForDate, 'd/M/yyyy'), o nulo si viene vacío</td>
+              <td data-i18n="lDate">Se parsea. Una fecha inválida no rechaza la fila.</td>
+            </tr>
+            <tr>
+              <td>filterDeliveryOrder</td>
+              <td>startsWith del prefijo _DeliveryOrder_ y último segmento contra yyyyMMdd'T'HHmmss'Z'</td>
+              <td data-i18n="lGate">Se informa con la fecha UTC de hoy. No cambia el conteo de válidas y rechazos.</td>
+            </tr>
+            <tr>
+              <td>BusquedaCosto</td>
+              <td>lookup ProductID == IDProduct, multiple false, pickup any</td>
+              <td data-i18n="lLookup">Sin diccionario en el repositorio. IDProduct y Sale Cost (USD) no se rellenan.</td>
+            </tr>
+            <tr>
+              <td>SelectionRows</td>
+              <td>split(not(isNull(Quantity))) hacia goodRows y badRows</td>
+              <td data-i18n="lSplit">Válida o rechazo, con el motivo de explain_order_row.</td>
+            </tr>
+            <tr>
+              <td>DerivarRechazos</td>
+              <td>RejectReason = 'Quantity is NULL'</td>
+              <td data-i18n="lReason">Ese texto corresponde a Quantity ausente o vacía. Una Quantity no numérica se rechaza por float() y el JSON no escribe otro motivo.</td>
+            </tr>
+            <tr>
+              <td>Orders / sinkRejects</td>
+              <td>mapColumn hacia dbo.Orders y el CSV de rejects</td>
+              <td data-i18n="lSink">Las dos ramas de la tabla. No hay base de datos en esta página.</td>
+            </tr>
+            <tr>
+              <td>if_hay_rechazos</td>
+              <td>sinkRejects.rowsWritten mayor que 0, luego POST</td>
+              <td data-i18n="lAlert">El cuerpo usa el conteo medido, v_customerName y los marcadores de la canalización.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 data-i18n="sqlTitle">Consulta sobre esta corrida</h2>
+      <p class="note" data-i18n="sqlNote">Motor de esta página, no Azure SQL. Tablas: run, accepted, rejected. Acepta SELECT, WHERE, GROUP BY, ORDER BY, LIMIT, COUNT y SUM. Los números salen de las filas ya clasificadas.</p>
+      <label class="field" for="sql">
+        <span data-i18n="sqlLabel">SQL</span>
+        <textarea id="sql" rows="6" spellcheck="false">SELECT status, reason, COUNT(*) AS n
+FROM run
+GROUP BY status, reason
+ORDER BY n DESC</textarea>
+      </label>
+      <div class="sql-actions">
+        <button type="button" id="run-sql" data-i18n="runSql">Ejecutar SQL</button>
+      </div>
+      <p id="sql-error" class="note" role="status"></p>
+      <div class="scroll" id="sql-out" tabindex="0"></div>
+
+      <h2 data-i18n="mermaidTitle">Mermaid del repositorio</h2>
+      <p class="note" data-i18n="mermaidNote">El dibujo de arriba usa los mismos nodos que Diagrams.md. El fuente Mermaid queda aquí.</p>
+      <details>
+        <summary data-i18n="mermaidSummary">Arquitectura y flujo de datos</summary>
+        <pre class="code">flowchart LR
+  event["Microsoft.Storage.BlobCreated /raw/blobs/ *.csv"]
+  trg["trg_raw_created"]
+  pl["pl_ordenes"]
+  df["df_orders_etl"]
+  raw["ds_orders_raw_csv filesystem raw"]
+  dict["ds_dict_usd_csv dict/Dict_USD.csv"]
+  orders["ds_sql_orders dbo.Orders"]
+  rejects["ds_rejects_csv filesystem rejects"]
+  web["web_alerta POST p_alertLogicAppUrl"]
+
+  event --> trg
+  trg -->|"p_folderPath, p_fileName"| pl
+  pl --> df
+  raw --> df
+  dict --> df
+  df -->|"goodRows"| orders
+  df -->|"badRows"| rejects
+  pl -->|"sinkRejects.rowsWritten mayor que 0"| web
+
+flowchart TD
+  pedidos["Pedidos ds_orders_raw_csv"]
+  derivarArchivo["DerivarArchivo"]
+  derivarCampos["DerivarCampos"]
+  filtro["filterDeliveryOrder"]
+  orden["OrdenFinal"]
+  lookup["BusquedaCosto"]
+  split{"SelectionRows not isNull Quantity"}
+  sinkOrders["Orders insert dbo.Orders"]
+  rechazos["DerivarRechazos"]
+  sinkRejects["sinkRejects"]
+
+  pedidos --> derivarArchivo --> derivarCampos --> filtro --> orden --> lookup --> split
+  split -->|goodRows| sinkOrders
+  split -->|badRows| rechazos --> sinkRejects</pre>
+      </details>
+    </main>
+    <footer>
+      <p data-i18n="typeNote">Tipografía Atkinson Hyperlegible, del Braille Institute, licencia OFL. En estas tablas se leen identificadores y cantidades, y esa fuente separa 0 de O y 1 de I. El verde #0e5c4a marca solo las filas y los conteos que classify_order_row deja como válidos.</p>
+      <div class="links">
+        <a href="https://github.com/Eflores1122">github.com/Eflores1122</a>
+        <a href="https://github.com/Eflores1122/azure-adf-orders-pipeline">azure-adf-orders-pipeline</a>
+        <a href="https://github.com/Eflores1122/azure-adf-orders-pipeline/blob/main/scripts/validate_adf.py">validate_adf.py</a>
+        <a href="https://github.com/Eflores1122/azure-adf-orders-pipeline/blob/main/dataflow/df_orders_etl.json">df_orders_etl.json</a>
+        <a href="https://github.com/Eflores1122/azure-adf-orders-pipeline/blob/main/Diagrams.md">Diagrams.md</a>
+      </div>
+    </footer>
+  </div>
+  <script src="js/classify.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

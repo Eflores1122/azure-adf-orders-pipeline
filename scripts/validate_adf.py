@@ -17,6 +17,7 @@ import csv
 import json
 import re
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import unquote
@@ -162,18 +163,156 @@ def linked_service_parameter_names(linked_service: dict[str, Any]) -> set[str]:
     return set(parameters)
 
 
-def classify_order_row(row: dict[str, str | None]) -> str:
-    """Return 'good' or 'reject' for one CSV row."""
+def explain_order_row(row: dict[str, str | None]) -> tuple[str, str]:
+    """Return (verdict, reason) using the same Quantity test as the local split.
+
+    reason is one of quantity_ok, quantity_missing, quantity_blank,
+    quantity_not_numeric. Qty is not an alias. float() is the conversion
+    used here; the data flow expression calls toInteger.
+    """
     if "Quantity" not in row or row.get("Quantity") is None:
-        return "reject"
+        return "reject", "quantity_missing"
     text = str(row.get("Quantity")).strip()
     if text == "":
-        return "reject"
+        return "reject", "quantity_blank"
     try:
         float(text)
     except ValueError:
-        return "reject"
-    return "good"
+        return "reject", "quantity_not_numeric"
+    return "good", "quantity_ok"
+
+
+def classify_order_row(row: dict[str, str | None]) -> str:
+    """Return 'good' or 'reject' for one CSV row."""
+    return explain_order_row(row)[0]
+
+
+def substring_index(value: str, delim: str, count: int) -> str:
+    """ADF substringIndex / Spark substring_index.
+
+    A count of 0 or an empty delimiter yields an empty string. If the
+    delimiter does not occur enough times, the whole value is returned.
+    """
+    if count == 0 or delim == "":
+        return ""
+    if count > 0:
+        start = 0
+        for index in range(count):
+            found = value.find(delim, start)
+            if found < 0:
+                return value
+            if index == count - 1:
+                return value[:found]
+            start = found + len(delim)
+        return value
+    end = len(value)
+    remaining = -count
+    for index in range(remaining):
+        found = value.rfind(delim, 0, end)
+        if found < 0:
+            return value
+        if index == remaining - 1:
+            return value[found + len(delim) :]
+        end = found
+    return value
+
+
+def customer_name(file_name: str) -> str:
+    """CustomerName = substringIndex(FileName, '_', 1)."""
+    return substring_index(file_name, "_", 1)
+
+
+def pipeline_customer(file_name: str) -> str:
+    """v_customerName from set_customer in pl_ordenes.json."""
+    chosen = file_name if file_name else "BestLocalPizza_DeliveryOrder_20250828T053149Z.csv"
+    return chosen.split("_")[0]
+
+
+def email_timestamp(file_name: str) -> str | None:
+    """EmailTimestamp expression from DerivarCampos, or None when it does not parse."""
+    stem = substring_index(file_name, ".csv", 1)
+    raw = substring_index(stem, "DeliveryOrder_", -1)
+    normalized = raw.replace("T", " ").replace("Z", "")
+    try:
+        parsed = datetime.strptime(normalized, "%Y%m%d %H%M%S")
+    except ValueError:
+        return None
+    return parsed.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def parse_for_date(value: str | None) -> str | None:
+    """toDate(ForDate, 'd/M/yyyy'). Blank or unparseable becomes None. Not a reject."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    if text == "":
+        return None
+    match = re.fullmatch(r"(\d{1,2})/(\d{1,2})/(\d{4})", text)
+    if match is None:
+        return None
+    day, month, year = (int(part) for part in match.groups())
+    try:
+        return datetime(year, month, day).date().isoformat()
+    except ValueError:
+        return None
+
+
+def file_gate(file_name: str, today: str) -> dict[str, Any]:
+    """filterDeliveryOrder from df_orders_etl.json, evaluated for one file name.
+
+    today is the UTC date yyyy-MM-dd that currentUTC() would supply.
+    The last '_' segment is matched against yyyyMMdd'T'HHmmss'Z' with no
+    extra characters, so a trailing .csv keeps the clause false.
+    """
+    prefix = substring_index(file_name, "_", 1) + "_DeliveryOrder_"
+    prefix_ok = file_name.upper().startswith(prefix.upper())
+    last = substring_index(file_name, "_", -1)
+    stamp_date = None
+    try:
+        parsed = datetime.strptime(last, "%Y%m%dT%H%M%SZ")
+    except ValueError:
+        parsed = None
+    if parsed is not None:
+        stamp_date = parsed.date().isoformat()
+    date_ok = stamp_date == today
+    return {
+        "prefix": prefix,
+        "prefix_ok": prefix_ok,
+        "last": last,
+        "stamp_date": stamp_date,
+        "date_ok": date_ok,
+        "passes": prefix_ok and date_ok,
+    }
+
+
+def reject_out_path(customer: str, file_name: str, now: datetime) -> str:
+    """OutFileName from DerivarRechazos. now must be UTC."""
+    return (
+        f"{now:%Y}/{now:%m}/{now:%d}/{customer}/"
+        f"{customer}_rejects_{now:%Y%m%d%H%M%S}_{file_name}"
+    )
+
+
+def explain_csv(path: Path) -> tuple[list[str], list[dict[str, Any]]]:
+    """Header plus one record per data row, with the same row numbers as classify_csv."""
+    with path.open(newline="", encoding="utf-8-sig") as handle:
+        reader = csv.DictReader(handle)
+        if reader.fieldnames is None:
+            raise ValueError(f"{path.name}: CSV has no header")
+        header = list(reader.fieldnames)
+        rows: list[dict[str, Any]] = []
+        for row_number, row in enumerate(reader, start=2):
+            verdict, reason = explain_order_row(row)
+            values = {key: row.get(key) for key in header}
+            rows.append(
+                {
+                    "line": row_number,
+                    "verdict": verdict,
+                    "reason": reason,
+                    "values": values,
+                }
+            )
+    return header, rows
 
 
 def classify_csv(path: Path) -> tuple[int, int, tuple[int, ...]]:
