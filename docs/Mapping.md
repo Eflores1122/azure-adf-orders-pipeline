@@ -37,6 +37,8 @@ This document details the **field mapping**, **data flow logic**, **design decis
 | (Derived)          | `substringIndex(FileName,'_',1)`                                                           | CustomerName       | nvarchar(100) |
 | (Derived)          | see “Derivations”                                                                          | EmailTimestamp     | datetime2(0)  |
 
+The checked-in `Quantity` expression in `dataflow/df_orders_etl.json` reads `Quantity` only: `iif(isNull(Quantity) || trim(Quantity)=='', toInteger(null()), toInteger(Quantity))`. `scripts/validate_adf.py` treats a missing `Quantity` column as null. `Qty` stays on the row and is not copied into `Quantity`. The dictionary source sets `ignoreNoFilesFound: false`, so a missing `dict/Dict_USD.csv` fails the data flow. That file is not in this repository.
+
 ### Derivations (Data Flow expressions)
 
 * FileName

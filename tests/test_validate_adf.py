@@ -51,6 +51,22 @@ def test_quantity_rule(row: dict[str, str | None], expected: str) -> None:
     assert validate_adf.classify_order_row(row) == expected
 
 
+def test_quantity_reasons() -> None:
+    assert validate_adf.explain_order_row({"Quantity": "12"}) == ("good", "quantity_ok")
+    assert validate_adf.explain_order_row({"Quantity": ""}) == ("reject", "quantity_blank")
+    assert validate_adf.explain_order_row({"Quantity": "abc"}) == ("reject", "quantity_not_numeric")
+    assert validate_adf.explain_order_row({"Qty": "10"}) == ("reject", "quantity_missing")
+    pizza = ROOT / "samples" / "BestLocalPizza_DeliveryOrder.csv"
+    _header, rows = validate_adf.explain_csv(pizza)
+    assert [(row["line"], row["reason"]) for row in rows if row["verdict"] == "reject"] == [
+        (8, "quantity_blank")
+    ]
+    fast = ROOT / "samples" / "FastFoodNY_DeliveryOrder.csv"
+    _header, rows = validate_adf.explain_csv(fast)
+    assert rows
+    assert {row["reason"] for row in rows} == {"quantity_missing"}
+
+
 def test_undefined_pipeline_parameter_is_reported() -> None:
     pipeline = {
         "properties": {
