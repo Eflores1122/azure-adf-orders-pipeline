@@ -131,8 +131,8 @@ The checked-in `Quantity` expression in `dataflow/df_orders_etl.json` reads `Qua
 
 ## Security & access
 
-* ADF Managed Identity with **Storage Blob Data Contributor** on the container.
-* Azure SQL auth (MI or connection string) with INSERT into `dbo.Orders`.
+* ADF managed identity with **Storage Blob Data Contributor** on the container.
+* Factory managed identity with INSERT on `dbo.Orders`. `linkedService/ls_sqldb_mi.json` uses `SystemAssignedManagedIdentity`. Keep SQL passwords, storage account keys, and connection strings out of this repository.
 
 ## Observability
 

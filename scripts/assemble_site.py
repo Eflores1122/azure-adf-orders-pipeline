@@ -5,13 +5,11 @@ from __future__ import annotations
 
 import json
 import shutil
-import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "scripts"))
+import validate_adf
 
-import validate_adf  # noqa: E402
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def assemble(root: Path, dest: Path) -> None:

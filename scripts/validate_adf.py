@@ -17,9 +17,10 @@ import csv
 import json
 import re
 import sys
+from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 from urllib.parse import unquote
 
 PIPELINE_PARAM_RE = re.compile(r"pipeline\(\)\.parameters\.([A-Za-z_][A-Za-z0-9_]*)")
@@ -40,6 +41,40 @@ CONCRETE_SQL_RE = re.compile(
 )
 SUBSCRIPTION_RE = re.compile(r"/subscriptions/[0-9a-fA-F-]{32,36}(?=/)")
 EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
+CONNECTION_STRING_MARKERS = (
+    "defaultendpointsprotocol=",
+    "accountkey=",
+    "sharedaccesssignature=",
+    "password=",
+    "pwd=",
+    "user id=",
+    "server=tcp:",
+    "data source=",
+    "initial catalog=",
+)
+TEXT_SCAN_SUFFIXES = {
+    ".md",
+    ".py",
+    ".js",
+    ".html",
+    ".css",
+    ".yml",
+    ".yaml",
+    ".csv",
+    ".txt",
+    ".toml",
+    ".sql",
+}
+TEXT_SCAN_SKIP_PARTS = {
+    ".git",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".mypy_cache",
+    ".venv",
+    "venv",
+    "_site",
+    "fonts",
+}
 
 
 def load_json(path: Path) -> Any:
@@ -75,16 +110,19 @@ def rel(path: Path, root: Path) -> str:
 
 
 def sensitive_identifier_errors(text: str, label: str) -> list[str]:
-    """Flag concrete infrastructure identifiers and webhook signatures."""
+    """Flag concrete infrastructure identifiers, webhook signatures, and connection strings."""
     errors: list[str] = []
+    lowered = text.lower()
     checks = (
         ("sig=", "signature query parameter"),
         ("logic.azure.com", "Logic App host"),
-        ("encryptedCredential", "encrypted credential property"),
+        ("encryptedcredential", "encrypted credential property"),
     )
     for needle, reason in checks:
-        if needle in text:
+        if needle in lowered:
             errors.append(f"{label}: contains a {reason}")
+    if any(marker in lowered for marker in CONNECTION_STRING_MARKERS):
+        errors.append(f"{label}: contains a connection string")
     if UUID_RE.search(text):
         errors.append(f"{label}: contains a UUID resource or tenant id")
     if CONCRETE_HOST_RE.search(text):
@@ -95,6 +133,37 @@ def sensitive_identifier_errors(text: str, label: str) -> list[str]:
         errors.append(f"{label}: contains a subscription resource id")
     if EMAIL_RE.search(text):
         errors.append(f"{label}: contains an email address")
+    return errors
+
+
+def text_file_identifier_errors(root: Path) -> list[str]:
+    """Scan supporting text for subscription ids, server hosts, and connection strings.
+
+    ADF JSON is checked separately. ``tests/`` and this detector contain example
+    patterns on purpose, so they are skipped.
+    """
+    root = root.resolve()
+    errors: list[str] = []
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(root)
+        if any(
+            part in TEXT_SCAN_SKIP_PARTS or (part.startswith(".") and part != ".github")
+            for part in relative.parts
+        ):
+            continue
+        if relative.parts[0] == "tests" or relative.as_posix() == "scripts/validate_adf.py":
+            continue
+        if path.suffix.lower() not in TEXT_SCAN_SUFFIXES:
+            continue
+        label = relative.as_posix()
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeError as exc:
+            errors.append(f"{label}: not valid UTF-8 ({exc})")
+            continue
+        errors.extend(sensitive_identifier_errors(text, label))
     return errors
 
 
@@ -288,8 +357,7 @@ def file_gate(file_name: str, today: str) -> dict[str, Any]:
 def reject_out_path(customer: str, file_name: str, now: datetime) -> str:
     """OutFileName from DerivarRechazos. now must be UTC."""
     return (
-        f"{now:%Y}/{now:%m}/{now:%d}/{customer}/"
-        f"{customer}_rejects_{now:%Y%m%d%H%M%S}_{file_name}"
+        f"{now:%Y}/{now:%m}/{now:%d}/{customer}/{customer}_rejects_{now:%Y%m%d%H%M%S}_{file_name}"
     )
 
 
@@ -404,10 +472,14 @@ def validate_repo(root: Path) -> list[str]:
             errors.append(f"publish_config.json: invalid JSON ({exc})")
             publish = None
         if isinstance(publish, dict):
-            if not isinstance(publish.get("publishBranch"), str) or not publish.get("publishBranch"):
+            if not isinstance(publish.get("publishBranch"), str) or not publish.get(
+                "publishBranch"
+            ):
                 errors.append("publish_config.json: publishBranch must be a non-empty string")
             errors.extend(
-                sensitive_identifier_errors(publish_path.read_text(encoding="utf-8"), "publish_config.json")
+                sensitive_identifier_errors(
+                    publish_path.read_text(encoding="utf-8"), "publish_config.json"
+                )
             )
 
     for name, factory in factories.items():
@@ -560,6 +632,7 @@ def validate_repo(root: Path) -> list[str]:
                 errors.append(f"samples/{path.name}: {exc}")
 
     errors.extend(_markdown_link_errors(root))
+    errors.extend(text_file_identifier_errors(root))
     return errors
 
 
