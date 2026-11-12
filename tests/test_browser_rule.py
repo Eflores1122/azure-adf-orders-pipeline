@@ -4,16 +4,14 @@ from __future__ import annotations
 
 import json
 import subprocess
-import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "scripts"))
+import validate_adf
 
-import validate_adf  # noqa: E402
+ROOT = Path(__file__).resolve().parents[1]
 CLASSIFY_JS = ROOT / "site" / "js" / "classify.js"
 
 FLOAT_CASES = [
@@ -153,12 +151,19 @@ def test_browser_float_substring_and_file_gate_match_python() -> None:
         ("abc", "_", 1, "abc"),
         ("BestLocalPizza_DeliveryOrder.csv", "_", 1, "BestLocalPizza"),
         ("BestLocalPizza_DeliveryOrder.csv", "_", -1, "DeliveryOrder.csv"),
-        ("BestLocalPizza_DeliveryOrder_20250828T053149Z.csv", ".csv", 1, "BestLocalPizza_DeliveryOrder_20250828T053149Z"),
+        (
+            "BestLocalPizza_DeliveryOrder_20250828T053149Z.csv",
+            ".csv",
+            1,
+            "BestLocalPizza_DeliveryOrder_20250828T053149Z",
+        ),
         ("Foo_DeliveryOrder_20250828T053149Z", "DeliveryOrder_", -1, "20250828T053149Z"),
     ]
     for index, (value, delim, count, result) in enumerate(substrings):
         case_id = f"sub-{index}"
-        cases.append({"id": case_id, "op": "substring", "value": value, "delim": delim, "count": count})
+        cases.append(
+            {"id": case_id, "op": "substring", "value": value, "delim": delim, "count": count}
+        )
         assert validate_adf.substring_index(value, delim, count) == result
         expected[case_id] = result
     names = [
@@ -184,11 +189,20 @@ def test_browser_float_substring_and_file_gate_match_python() -> None:
                 "value": validate_adf.customer_name(name),
                 "pipeline": validate_adf.pipeline_customer(name),
             }
-    for text in ("10/09/2025", "28/8/2025", "13/09/2025", "", "   ", "31/02/2025", "2025-09-10", None):
+    for text in (
+        "10/09/2025",
+        "28/8/2025",
+        "13/09/2025",
+        "",
+        "   ",
+        "31/02/2025",
+        "2025-09-10",
+        None,
+    ):
         case_id = f"date-{text}"
         cases.append({"id": case_id, "op": "fordate", "text": text})
         expected[case_id] = validate_adf.parse_for_date(text)
-    now = datetime(2026, 11, 10, 18, 44, 5, tzinfo=timezone.utc)
+    now = datetime(2026, 11, 10, 18, 44, 5, tzinfo=UTC)
     cases.append(
         {
             "id": "out",
@@ -198,7 +212,9 @@ def test_browser_float_substring_and_file_gate_match_python() -> None:
             "iso": now.isoformat().replace("+00:00", "Z"),
         }
     )
-    expected["out"] = validate_adf.reject_out_path("BestLocalPizza", "BestLocalPizza_DeliveryOrder.csv", now)
+    expected["out"] = validate_adf.reject_out_path(
+        "BestLocalPizza", "BestLocalPizza_DeliveryOrder.csv", now
+    )
     results = {item["id"]: item for item in _run_node(cases)}
     for case_id, want in expected.items():
         got = results[case_id]
@@ -264,7 +280,14 @@ def test_browser_sql_runs_on_classified_rows() -> None:
         "bad": "SELECT nope FROM run",
     }
     cases = [
-        {"id": key, "op": "sql", "name": path.name, "text": text, "today": "2026-11-10", "query": query}
+        {
+            "id": key,
+            "op": "sql",
+            "name": path.name,
+            "text": text,
+            "today": "2026-11-10",
+            "query": query,
+        }
         for key, query in queries.items()
     ]
     results = {item["id"]: item for item in _run_node(cases)}

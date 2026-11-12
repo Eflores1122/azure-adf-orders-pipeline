@@ -134,7 +134,7 @@ Para procesar solo el blob que disparó el evento:
 ## Seguridad y acceso
 
 * Identidad administrada de ADF con rol de **Colaborador de datos del Blob de Storage** sobre el contenedor.
-* Azure SQL: autenticación (MI o cadena de conexión) con permisos para `INSERT` en `dbo.Orders`.
+* Identidad administrada de la factoría con permiso de `INSERT` en `dbo.Orders`. `linkedService/ls_sqldb_mi.json` usa `SystemAssignedManagedIdentity`. Las contraseñas de SQL, las claves de storage y las cadenas de conexión se quedan fuera de este repositorio.
 
 ## Observabilidad
 
